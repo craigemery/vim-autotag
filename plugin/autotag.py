@@ -61,15 +61,20 @@ def vim_global(name, kind=str):
     """ Get global variable from vim, cast it appropriately """
     ret = GLOBALS_DEFAULTS.get(name, None)
     try:
-        v = "g:autotag%s" % name
-        exists = (vim.eval("exists('%s')" % v) == "1")
-        if exists:
-            ret = vim.eval(v)
+        v = "autotag" + name
+        v_buffer = "b:" + v
+        exists_buffer = (vim.eval("exists('%s')" % v_buffer) == "1")
+        v_global = "g:" + v
+        exists_global = (vim.eval("exists('%s')" % v_global) == "1")
+        if exists_buffer:
+            ret = vim.eval(v_buffer)
+        elif exists_global:
+            ret = vim.eval(v_global)
         else:
             if isinstance(ret, int):
-                vim.command("let %s=%s" % (v, ret))
+                vim.command("let %s=%s" % (v_global, ret))
             else:
-                vim.command("let %s=\"%s\"" % (v, ret))
+                vim.command("let %s=\"%s\"" % (v_global, ret))
     finally:
         if kind == bool:
             ret = (ret not in [0, "0"])
