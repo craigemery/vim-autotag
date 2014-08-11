@@ -6,7 +6,7 @@ import os
 import os.path
 import fileinput
 import sys
-import vim
+import vim  # pylint: disable=F0401
 import logging
 from collections import defaultdict
 
@@ -129,7 +129,7 @@ except NameError:
     setLoggerVerbosity()
 
 
-class AutoTag:
+class AutoTag(object):  # pylint: disable=R0902
     """ Class that does auto ctags updating """
     MAXTAGSFILESIZE = long(vim_global("maxTagsFileSize"))
     LOG = LOGGER
@@ -191,7 +191,7 @@ class AutoTag:
             return
         found = self.findTagFile(source)
         if found:
-            tags_dir, tags_file = found
+            (tags_dir, tags_file) = found  # pylint: disable=W0633
             relative_source = os.path.splitdrive(source)[1][len(tags_dir):]
             if relative_source[0] == os.sep:
                 relative_source = relative_source[1:]
@@ -255,5 +255,5 @@ def autotag():
             at = AutoTag()
             at.addSource(vim.eval("expand(\"%:p\")"))
             at.rebuildTagFiles()
-    except Exception:
+    except Exception:  # pylint: disable=W0703
         logging.warning(format_exc())
