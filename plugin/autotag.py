@@ -24,6 +24,7 @@ GLOBALS_DEFAULTS = dict(maxTagsFileSize=1024 * 1024 * 7,
                         VerbosityLevel=logging.WARNING,
                         CtagsCmd="ctags",
                         TagsFile="tags",
+                        TagsDir="",
                         Disabled=0,
                         StopAt=0)
 
@@ -141,6 +142,8 @@ class AutoTag(object):  # pylint: disable=R0902
         self.sep_used_by_ctags = '/'
         self.ctags_cmd = vim_global("CtagsCmd")
         self.tags_file = str(vim_global("TagsFile"))
+        self.tags_dir = str(vim_global("TagsDir"))
+        self.parents = os.pardir * (len(os.path.split(self.tags_dir)) - 1)
         self.count = 0
         self.stop_at = vim_global("StopAt")
 
@@ -153,7 +156,7 @@ class AutoTag(object):  # pylint: disable=R0902
             fname = os.path.dirname(fname)
             AutoTag.LOG.info('drive = "%s", file = "%s"', drive, fname)
             tags_dir = os.path.join(drive, fname)
-            tags_file = os.path.join(tags_dir, self.tags_file)
+            tags_file = os.path.join(tags_dir, self.tags_dir, self.tags_file)
             AutoTag.LOG.info('testing tags_file "%s"', tags_file)
             if os.path.isfile(tags_file):
                 st = os.stat(tags_file)
@@ -230,6 +233,8 @@ class AutoTag(object):  # pylint: disable=R0902
 
     def updateTagsFile(self, tags_dir, tags_file, sources):
         """ Strip all tags for the source file, then re-run ctags in append mode """
+        if self.tags_dir:
+            sources = [os.path.join(self.parents + s) for s in sources]
         self.stripTags(tags_file, sources)
         if self.tags_file:
             cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
