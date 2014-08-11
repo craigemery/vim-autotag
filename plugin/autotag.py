@@ -24,6 +24,7 @@ GLOBALS_DEFAULTS = dict(maxTagsFileSize=1024 * 1024 * 7,
                         VerbosityLevel=logging.WARNING,
                         CtagsCmd="ctags",
                         TagsFile="tags",
+                        TagsDir="",
                         Disabled=0,
                         StopAt=0)
 
@@ -141,6 +142,7 @@ class AutoTag:
         self.sep_used_by_ctags = '/'
         self.ctags_cmd = vim_global("CtagsCmd")
         self.tags_file = str(vim_global("TagsFile"))
+        self.tags_dir = str(vim_global("TagsDir"))
         self.count = 0
         self.stop_at = vim_global("StopAt")
 
@@ -153,8 +155,8 @@ class AutoTag:
             fname = os.path.dirname(fname)
             AutoTag.LOG.info('drive = "%s", file = "%s"', drive, fname)
             tags_dir = os.path.join(drive, fname)
-            tags_file = os.path.join(tags_dir, self.tags_file)
-            AutoTag.LOG.info('testing tags_file "%s"', tags_file)
+            tags_file = os.path.join(tags_dir, self.tags_dir, self.tags_file)
+            AutoTag.LOG.info('testing tags_file "%s" "%s"', tags_file, self.tags_dir)
             if os.path.isfile(tags_file):
                 st = os.stat(tags_file)
                 if st:
@@ -230,13 +232,21 @@ class AutoTag:
 
     def updateTagsFile(self, tags_dir, tags_file, sources):
         """ Strip all tags for the source file, then re-run ctags in append mode """
+        if self.tags_dir != "":
+            srcs = []
+            for source in sources:
+                srcs.append("../"+source)
+            sources = srcs
         self.stripTags(tags_file, sources)
         if self.tags_file:
-            cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
+            if self.tags_dir != "":
+                cmd = "cd %s ; %s -f %s -a " % (self.tags_dir, self.ctags_cmd, self.tags_file)
+            else: 
+                cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
         else:
             cmd = "%s -a " % (self.ctags_cmd,)
         for source in sources:
-            if os.path.isfile(os.path.join(tags_dir, source)):
+            if os.path.isfile(os.path.join(tags_dir, self.tags_dir, source)):
                 cmd += ' "%s"' % source
         AutoTag.LOG.log(1, "%s: %s", tags_dir, cmd)
         for l in do_cmd(cmd, tags_dir):
