@@ -241,10 +241,10 @@ class AutoTag(object):  # pylint: disable=R0902
         else:
             cmd = "%s -a " % (self.ctags_cmd,)
         for source in sources:
-            if os.path.isfile(os.path.join(tags_dir, source)):
+            if os.path.isfile(os.path.join(tags_dir, self.tags_dir, source)):
                 cmd += ' "%s"' % source
         AutoTag.LOG.log(1, "%s: %s", tags_dir, cmd)
-        for l in do_cmd(cmd, tags_dir):
+        for l in do_cmd(cmd, self.tags_dir or tags_dir):
             AutoTag.LOG.log(10, l)
 
     def rebuildTagFiles(self):
