@@ -17,11 +17,13 @@ Installation
 ------------
 
 Currently I suggest you simply
-    cd
-    git clone git://github.com/craigemery/vim-autotag.git
-    cd ~/.vim/
-    mkdir -p plugin
-    cp ~/vim-autotag.git/plugin/autotag.vim plugin/
+```
+cd
+git clone git://github.com/craigemery/vim-autotag.git
+cd ~/.vim/
+mkdir -p plugin
+cp ~/vim-autotag.git/plugin/* plugin/
+```
 
 Self-Promotion
 --------------
