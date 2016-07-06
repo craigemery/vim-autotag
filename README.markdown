@@ -23,6 +23,11 @@ Currently I suggest you simply
     mkdir -p plugin
     cp ~/vim-autotag.git/plugin/autotag.vim plugin/
 
+### Install as a Pathogen bundle
+```
+git clone git://github.com/craigemery/vim-autotag.git ~/.vim/bundle/vim-autotag
+```
+
 Self-Promotion
 --------------
 
