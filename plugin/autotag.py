@@ -1,4 +1,5 @@
 """
+(c) Craig Emery 2016
 AutoTag.py
 """
 
