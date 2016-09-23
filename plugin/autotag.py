@@ -48,15 +48,16 @@ if sys.version < '2.4':
 else:
     import subprocess
 
+    kw = {"universal_newlines": True} if sys.version >= '3.5' else {}
+
     def do_cmd(cmd, cwd):
         """ Abstract subprocess """
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                             cwd=cwd)
+                             cwd=cwd, **kw)
         so = p.communicate()[0]
         return so.split("\n")
 
     from traceback import format_exc
-
 
 def vim_global(name, kind=str):
     """ Get global variable from vim, cast it appropriately """
@@ -132,7 +133,7 @@ except NameError:
 
 class AutoTag(object):  # pylint: disable=R0902
     """ Class that does auto ctags updating """
-    MAXTAGSFILESIZE = long(vim_global("maxTagsFileSize"))
+    MAXTAGSFILESIZE = int(vim_global("maxTagsFileSize"))
     LOG = LOGGER
 
     def __init__(self):
@@ -223,7 +224,7 @@ class AutoTag(object):  # pylint: disable=R0902
             for l in source:
                 l = l.strip()
                 if self.goodTag(l, sources):
-                    print l
+                    print(l)
         finally:
             source.close()
             try:
