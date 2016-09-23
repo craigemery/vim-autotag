@@ -16,7 +16,17 @@ This way, every time you save a file, your tags file will be seamlessly updated.
 Installation
 ------------
 
-Currently I suggest you simply
+Currently I suggest you use Vundle and install as a normal Bundle
+
+From the Vim command-line
+
+: BundleInstall 'craigemery/vim-autotag'
+
+And add to your ~/.vimrc
+
+Bundle 'craigemery/vim-autotag'
+
+Or you can manually install
     cd
     git clone git://github.com/craigemery/vim-autotag.git
     cd ~/.vim/
