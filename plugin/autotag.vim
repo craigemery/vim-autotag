@@ -21,7 +21,7 @@ if has("python") || has("python3")
    if has("python")
       python  import sys, os, vim
       python  sys.path.insert(0, os.path.dirname(vim.eval('expand("<sfile>")')))
-      python  from __future import print_statement
+      python  from __future__ import print_function
       python  from autotag import autotag
    else
       python3 import sys, os, vim
