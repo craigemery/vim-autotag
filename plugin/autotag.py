@@ -49,12 +49,16 @@ if sys.version < '2.4':
 else:
     import subprocess
 
-    kw = {"universal_newlines": True} if sys.version >= '3.5' else {}
+    kw = {"shell": True,
+          "stdin": subprocess.PIPE,
+          "stdout": subprocess.PIPE,
+          "stderr": subprocess.PIPE}
+    if sys.version >= '3.5':
+        kw["universal_newlines"] = True
 
     def do_cmd(cmd, cwd):
         """ Abstract subprocess """
-        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                             cwd=cwd, **kw)
+        p = subprocess.Popen(cmd, cwd=cwd, **kw)
         so = p.communicate()[0]
         return so.split("\n")
 
