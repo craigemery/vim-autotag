@@ -30,6 +30,9 @@ if has("python") || has("python3")
    endif
 
    function! AutoTag()
+      if exists("b:netrw_method")
+         return
+      endif
       if has("python")
          python  autotag()
       else
