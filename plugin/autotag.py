@@ -149,7 +149,7 @@ class AutoTag(object):  # pylint: disable=R0902
         self.ctags_cmd = vim_global("CtagsCmd")
         self.tags_file = str(vim_global("TagsFile"))
         self.tags_dir = str(vim_global("TagsDir"))
-        self.parents = os.pardir * (len(os.path.split(self.tags_dir)) - 1)
+        self.parents = (os.pardir + os.sep) * (len(os.path.split(self.tags_dir)) - 1)
         self.count = 0
         self.stop_at = vim_global("StopAt")
 
@@ -241,16 +241,17 @@ class AutoTag(object):  # pylint: disable=R0902
         """ Strip all tags for the source file, then re-run ctags in append mode """
         if self.tags_dir:
             sources = [os.path.join(self.parents + s) for s in sources]
+            tags_dir = os.path.join(tags_dir, self.tags_dir)
         self.stripTags(tags_file, sources)
         if self.tags_file:
             cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
         else:
             cmd = "%s -a " % (self.ctags_cmd,)
         for source in sources:
-            if os.path.isfile(os.path.join(tags_dir, self.tags_dir, source)):
+            if os.path.isfile(os.path.join(tags_dir, source)):
                 cmd += ' "%s"' % source
         AutoTag.LOG.log(1, "%s: %s", tags_dir, cmd)
-        for l in do_cmd(cmd, self.tags_dir or tags_dir):
+        for l in do_cmd(cmd, tags_dir):
             AutoTag.LOG.log(10, l)
 
     def rebuildTagFiles(self):
