@@ -1,4 +1,4 @@
-" (c) Craig Emery 2016
+" (c) Craig Emery 2018
 "
 " Increment the number below for a dynamic #include guard
 let s:autotag_vim_version=1
