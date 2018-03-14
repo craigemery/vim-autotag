@@ -1,15 +1,16 @@
 """
-(c) Craig Emery 2016
+(c) Craig Emery 2018
 AutoTag.py
 """
 
+from __future__ import print_function
 import os
 import os.path
 import fileinput
 import sys
-import vim  # pylint: disable=F0401
 import logging
 from collections import defaultdict
+import vim  # pylint: disable=import-error
 
 # global vim config variables used (all are g:autotag<name>):
 # name purpose
@@ -35,43 +36,44 @@ if sys.version < '2.4':
         """ Python 2.3 has no subprocess """
         old_cwd = os.getcwd()
         os.chdir(cwd)
-        ch_out = os.popen2(cmd)[1]
+        ch_out = os.popen2(cmd)[1]  # pylint: disable=deprecated-method
         for _ in ch_out:
             pass
         os.chdir(old_cwd)
 
-    import traceback
+    from traceback import format_exception  # pylint: disable=wrong-import-position,wrong-import-order
 
     def format_exc():
         """ replace missing format_exc() """
-        return ''.join(traceback.format_exception(*list(sys.exc_info())))
+        return ''.join(format_exception(*list(sys.exc_info())))
 
 else:
-    import subprocess
+    import subprocess  # pylint: disable=wrong-import-position,wrong-import-order
 
-    kw = {"shell": True,
+    KW = {"shell": True,
           "stdin": subprocess.PIPE,
           "stdout": subprocess.PIPE,
           "stderr": subprocess.PIPE}
-    if sys.version >= '3.5':
-        kw["universal_newlines"] = True
+    if sys.version >= '3':
+        KW["universal_newlines"] = True
 
     def do_cmd(cmd, cwd):
         """ Abstract subprocess """
-        p = subprocess.Popen(cmd, cwd=cwd, **kw)
-        so = p.communicate()[0]
-        return so.split("\n")
+        proc = subprocess.Popen(cmd, cwd=cwd, **KW)
+        stdout = proc.communicate()[0]
+        return stdout.split("\n")
 
-    from traceback import format_exc
+    from traceback import format_exc  # pylint: disable=wrong-import-position,wrong-import-order,ungrouped-imports
+
 
 def vim_global(name, kind=str):
     """ Get global variable from vim, cast it appropriately """
     ret = GLOBALS_DEFAULTS.get(name, None)
     try:
-        v = "autotag" + name
-        v_buffer = "b:" + v
+        vname = "autotag" + name
+        v_buffer = "b:" + vname
         exists_buffer = (vim.eval("exists('%s')" % v_buffer) == "1")
-        v_global = "g:" + v
+        v_global = "g:" + vname
         exists_global = (vim.eval("exists('%s')" % v_global) == "1")
         if exists_buffer:
             ret = vim.eval(v_buffer)
@@ -88,7 +90,7 @@ def vim_global(name, kind=str):
         elif kind == int:
             ret = int(ret)
         elif kind == str:
-            ret = str(ret)
+            ret = str(ret)  # pylint: disable=redefined-variable-type
     return ret
 
 
@@ -99,20 +101,20 @@ class VimAppendHandler(logging.Handler):
         self.__name = name
         self.__formatter = logging.Formatter()
 
-    def __findBuffer(self):
+    def __find_buffer(self):
         """ Look for the named buffer """
-        for b in vim.buffers:
-            if b and b.name and b.name.endswith(self.__name):
-                return b
+        for buff in vim.buffers:
+            if buff and buff.name and buff.name.endswith(self.__name):
+                return buff
 
     def emit(self, record):
         """ Emit the logging message """
-        b = self.__findBuffer()
-        if b:
-            b.append(self.__formatter.format(record))
+        buff = self.__find_buffer()
+        if buff:
+            buff.append(self.__formatter.format(record))
 
 
-def setLoggerVerbosity():
+def set_logger_verbosity():
     """ Set the verbosity of the logger """
     try:
         level = int(vim_global("VerbosityLevel"))
@@ -121,22 +123,23 @@ def setLoggerVerbosity():
     LOGGER.setLevel(level)
 
 
-def makeAndAddHandler(logger, name):
+def make_and_add_handler(logger, name):
     """ Make the handler and add it to the standard logger """
     ret = VimAppendHandler(name)
     logger.addHandler(ret)
     return ret
+
 
 try:
     LOGGER
 except NameError:
     DEBUG_NAME = "autotag_debug"
     LOGGER = logging.getLogger(DEBUG_NAME)
-    HANDLER = makeAndAddHandler(LOGGER, DEBUG_NAME)
-    setLoggerVerbosity()
+    HANDLER = make_and_add_handler(LOGGER, DEBUG_NAME)
+    set_logger_verbosity()
 
 
-class AutoTag(object):  # pylint: disable=R0902
+class AutoTag(object):  # pylint: disable=too-many-instance-attributes
     """ Class that does auto ctags updating """
     MAXTAGSFILESIZE = int(vim_global("maxTagsFileSize"))
     LOG = LOGGER
@@ -144,7 +147,7 @@ class AutoTag(object):  # pylint: disable=R0902
     def __init__(self):
         self.tags = defaultdict(list)
         self.excludesuffix = ["." + s for s in vim_global("ExcludeSuffixes").split(".")]
-        setLoggerVerbosity()
+        set_logger_verbosity()
         self.sep_used_by_ctags = '/'
         self.ctags_cmd = vim_global("CtagsCmd")
         self.tags_file = str(vim_global("TagsFile"))
@@ -153,7 +156,7 @@ class AutoTag(object):  # pylint: disable=R0902
         self.count = 0
         self.stop_at = vim_global("StopAt")
 
-    def findTagFile(self, source):
+    def find_tag_file(self, source):
         """ Find the tag file that belongs to the source file """
         AutoTag.LOG.info('source = "%s"', source)
         (drive, fname) = os.path.splitdrive(source)
@@ -165,9 +168,9 @@ class AutoTag(object):  # pylint: disable=R0902
             tags_file = os.path.join(tags_dir, self.tags_dir, self.tags_file)
             AutoTag.LOG.info('testing tags_file "%s"', tags_file)
             if os.path.isfile(tags_file):
-                st = os.stat(tags_file)
-                if st:
-                    size = getattr(st, 'st_size', None)
+                stinf = os.stat(tags_file)
+                if stinf:
+                    size = getattr(stinf, 'st_size', None)
                     if size is None:
                         AutoTag.LOG.warn("Could not stat tags file %s", tags_file)
                         break
@@ -177,16 +180,16 @@ class AutoTag(object):  # pylint: disable=R0902
                 ret = (fname, tags_file)
                 break
             elif tags_dir and tags_dir == self.stop_at:
-                AutoTag.LOG.info("Reached %s. Making one %s" % (self.stop_at, tags_file))
+                AutoTag.LOG.info("Reached %s. Making one %s", self.stop_at, tags_file)
                 open(tags_file, 'wb').close()
                 ret = (fname, tags_file)
                 break
             elif not fname or fname == os.sep or fname == "//" or fname == "\\\\":
-                AutoTag.LOG.info('bail (file = "%s")' % (fname, ))
+                AutoTag.LOG.info('bail (file = "%s")', fname)
                 break
         return ret
 
-    def addSource(self, source):
+    def add_source(self, source):
         """ Make a note of the source file, ignoring some etc """
         if not source:
             AutoTag.LOG.warn('No source')
@@ -198,7 +201,7 @@ class AutoTag(object):  # pylint: disable=R0902
         if suff in self.excludesuffix:
             AutoTag.LOG.info("Ignoring excluded suffix %s for file %s", source, suff)
             return
-        found = self.findTagFile(source)
+        found = self.find_tag_file(source)
         if found:
             (tags_dir, tags_file) = found  # pylint: disable=W0633
             relative_source = os.path.splitdrive(source)[1][len(tags_dir):]
@@ -209,27 +212,27 @@ class AutoTag(object):  # pylint: disable=R0902
             self.tags[(tags_dir, tags_file)].append(relative_source)
 
     @staticmethod
-    def goodTag(line, excluded):
+    def good_tag(line, excluded):
         """ Filter method for stripping tags """
         if line[0] == '!':
             return True
         else:
-            f = line.split('\t')
-            AutoTag.LOG.log(1, "read tags line:%s", str(f))
-            if len(f) > 3 and f[1] not in excluded:
+            fields = line.split('\t')
+            AutoTag.LOG.log(1, "read tags line:%s", str(fields))
+            if len(fields) > 3 and fields[1] not in excluded:
                 return True
         return False
 
-    def stripTags(self, tags_file, sources):
+    def strip_tags(self, tags_file, sources):
         """ Strip all tags for a given source file """
         AutoTag.LOG.info("Stripping tags for %s from tags file %s", ",".join(sources), tags_file)
         backup = ".SAFE"
         source = fileinput.FileInput(files=tags_file, inplace=True, backup=backup)
         try:
-            for l in source:
-                l = l.strip()
-                if self.goodTag(l, sources):
-                    print(l)
+            for line in source:
+                line = line.strip()
+                if self.good_tag(line, sources):
+                    print(line)
         finally:
             source.close()
             try:
@@ -237,11 +240,11 @@ class AutoTag(object):  # pylint: disable=R0902
             except StandardError:
                 pass
 
-    def updateTagsFile(self, tags_dir, tags_file, sources):
+    def update_tags_file(self, tags_dir, tags_file, sources):
         """ Strip all tags for the source file, then re-run ctags in append mode """
         if self.tags_dir:
             sources = [os.path.join(self.parents + s) for s in sources]
-        self.stripTags(tags_file, sources)
+        self.strip_tags(tags_file, sources)
         if self.tags_file:
             cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
         else:
@@ -250,21 +253,21 @@ class AutoTag(object):  # pylint: disable=R0902
             if os.path.isfile(os.path.join(tags_dir, self.tags_dir, source)):
                 cmd += ' "%s"' % source
         AutoTag.LOG.log(1, "%s: %s", tags_dir, cmd)
-        for l in do_cmd(cmd, self.tags_dir or tags_dir):
-            AutoTag.LOG.log(10, l)
+        for line in do_cmd(cmd, self.tags_dir or tags_dir):
+            AutoTag.LOG.log(10, line)
 
-    def rebuildTagFiles(self):
+    def rebuild_tag_files(self):
         """ rebuild the tags file """
         for ((tags_dir, tags_file), sources) in self.tags.items():
-            self.updateTagsFile(tags_dir, tags_file, sources)
+            self.update_tags_file(tags_dir, tags_file, sources)
 
 
 def autotag():
     """ Do the work """
     try:
         if not vim_global("Disabled", bool):
-            at = AutoTag()
-            at.addSource(vim.eval("expand(\"%:p\")"))
-            at.rebuildTagFiles()
+            runner = AutoTag()
+            runner.add_source(vim.eval("expand(\"%:p\")"))
+            runner.rebuild_tag_files()
     except Exception:  # pylint: disable=W0703
         logging.warning(format_exc())
