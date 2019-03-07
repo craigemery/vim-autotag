@@ -11,6 +11,7 @@ import sys
 import logging
 from collections import defaultdict
 import vim  # pylint: disable=import-error
+import multiprocessing
 
 # global vim config variables used (all are g:autotag<name>):
 # name purpose
@@ -261,6 +262,8 @@ class AutoTag(object):  # pylint: disable=too-many-instance-attributes
         for ((tags_dir, tags_file), sources) in self.tags.items():
             self.update_tags_file(tags_dir, tags_file, sources)
 
+def backProcess(runner):
+    runner.rebuild_tag_files()
 
 def autotag():
     """ Do the work """
@@ -268,6 +271,9 @@ def autotag():
         if not vim_global("Disabled", bool):
             runner = AutoTag()
             runner.add_source(vim.eval("expand(\"%:p\")"))
-            runner.rebuild_tag_files()
+            #runner.rebuild_tag_files()
+            process = multiprocessing.Process(target=backProcess, args=(runner,))
+            process.daemon = True
+            process.start()
     except Exception:  # pylint: disable=W0703
         logging.warning(format_exc())
