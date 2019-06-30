@@ -214,10 +214,10 @@ class AutoTag(object):  # pylint: disable=too-many-instance-attributes
     @staticmethod
     def good_tag(line, excluded):
         """ Filter method for stripping tags """
-        if line[0] == '!':
+        if line.startswith(b'!'):
             return True
         else:
-            fields = line.split('\t')
+            fields = line.split(b'\t')
             AutoTag.LOG.log(1, "read tags line:%s", str(fields))
             if len(fields) > 3 and fields[1] not in excluded:
                 return True
@@ -227,12 +227,12 @@ class AutoTag(object):  # pylint: disable=too-many-instance-attributes
         """ Strip all tags for a given source file """
         AutoTag.LOG.info("Stripping tags for %s from tags file %s", ",".join(sources), tags_file)
         backup = ".SAFE"
-        source = fileinput.FileInput(files=tags_file, inplace=True, backup=backup)
+        source = fileinput.FileInput(files=tags_file, inplace=True, backup=backup, mode='rb')
         try:
             for line in source:
                 line = line.strip()
                 if self.good_tag(line, sources):
-                    print(line)
+                    print(line.decode('utf-8', errors='replace'))
         finally:
             source.close()
             try:
