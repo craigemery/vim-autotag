@@ -35,6 +35,10 @@ GLOBALS_DEFAULTS = dict(ExcludeSuffixes="tml.xml.text.txt",
 
 def fix_multiprocessing():
     """ Find a good Python executable to use for multiprocessing.Process """
+    if sys.executable:
+        multiprocessing.set_executable(sys.executable)
+        return
+
     exes = glob.glob(os.path.join(sys.exec_prefix, "python*.exe"))
     win = [exe for exe in exes if exe.endswith("w.exe")]
     if win:
