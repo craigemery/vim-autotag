@@ -31,7 +31,7 @@ Or you can manually install
     git clone git://github.com/craigemery/vim-autotag.git
     cd ~/.vim/
     mkdir -p plugin
-    cp ~/vim-autotag.git/plugin/autotag.vim plugin/
+    cp ~/vim-autotag.git/plugin/* plugin/
 
 ### Install as a Pathogen bundle
 ```
@@ -44,7 +44,6 @@ Autotag can be configured using the following global variables:
 
 | Name | Purpose |
 | ---- | ------- |
-| `g:autotagmaxTagsFileSize` | a cap on what size (in bytes) tag file to strip etc |
 | `g:autotagExcludeSuffixes` | suffixes to not ctags on |
 | `g:autotagVerbosityLevel` | logging verbosity (as in Python logging module) |
 | `g:autotagCtagsCmd` | name of ctags command |
