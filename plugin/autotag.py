@@ -1,5 +1,5 @@
 """
-(c) Craig Emery 2018
+(c) Craig Emery 2017-2020
 AutoTag.py
 """
 
@@ -7,22 +7,24 @@ from __future__ import print_function
 import os
 import os.path
 import fileinput
-import sys
 import logging
 from collections import defaultdict
+import subprocess
+from traceback import format_exc
+import sys
+import multiprocessing
+import glob
 import vim  # pylint: disable=import-error
 
 # global vim config variables used (all are g:autotag<name>):
 # name purpose
-# maxTagsFileSize a cap on what size tag file to strip etc
 # ExcludeSuffixes suffixes to not ctags on
 # VerbosityLevel logging verbosity (as in Python logging module)
 # CtagsCmd name of ctags command
 # TagsFile name of tags file to look for
 # Disabled Disable autotag (enable by setting to any non-blank value)
 # StopAt stop looking for a tags file (and make one) at this directory (defaults to $HOME)
-GLOBALS_DEFAULTS = dict(maxTagsFileSize=1024 * 1024 * 7,
-                        ExcludeSuffixes="tml.xml.text.txt",
+GLOBALS_DEFAULTS = dict(ExcludeSuffixes="tml.xml.text.txt",
                         VerbosityLevel=logging.WARNING,
                         CtagsCmd="ctags",
                         TagsFile="tags",
@@ -30,40 +32,33 @@ GLOBALS_DEFAULTS = dict(maxTagsFileSize=1024 * 1024 * 7,
                         Disabled=0,
                         StopAt=0)
 
-# Just in case the ViM build you're using doesn't have subprocess
-if sys.version < '2.4':
-    def do_cmd(cmd, cwd):
-        """ Python 2.3 has no subprocess """
-        old_cwd = os.getcwd()
-        os.chdir(cwd)
-        ch_out = os.popen2(cmd)[1]  # pylint: disable=deprecated-method
-        for _ in ch_out:
-            pass
-        os.chdir(old_cwd)
 
-    from traceback import format_exception  # pylint: disable=wrong-import-position,wrong-import-order
+def fix_multiprocessing():
+    """ Find a good Python executable to use for multiprocessing.Process """
+    exes = glob.glob(os.path.join(sys.exec_prefix, "python*.exe"))
+    win = [exe for exe in exes if exe.endswith("w.exe")]
+    if win:
+        # In Windows pythonw.exe is best
+        multiprocessing.set_executable(win[0])
+    else:
+        # This is bad, for now pick the first one
+        multiprocessing.set_executable(exes[0])
 
-    def format_exc():
-        """ replace missing format_exc() """
-        return ''.join(format_exception(*list(sys.exc_info())))
 
-else:
-    import subprocess  # pylint: disable=wrong-import-position,wrong-import-order
+fix_multiprocessing()
 
-    KW = {"shell": True,
-          "stdin": subprocess.PIPE,
-          "stdout": subprocess.PIPE,
-          "stderr": subprocess.PIPE}
-    if sys.version >= '3':
-        KW["universal_newlines"] = True
 
-    def do_cmd(cmd, cwd):
-        """ Abstract subprocess """
-        proc = subprocess.Popen(cmd, cwd=cwd, **KW)
-        stdout = proc.communicate()[0]
-        return stdout.split("\n")
-
-    from traceback import format_exc  # pylint: disable=wrong-import-position,wrong-import-order,ungrouped-imports
+def do_cmd(cmd, cwd):
+    """ Abstract subprocess """
+    proc = subprocess.Popen(cmd,
+                            cwd=cwd,
+                            shell=True,
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            universal_newlines=True)
+    stdout = proc.communicate()[0]
+    return stdout.split("\n")
 
 
 def vim_global(name, kind=str):
@@ -86,11 +81,17 @@ def vim_global(name, kind=str):
                 vim.command("let %s=\"%s\"" % (v_global, ret))
     finally:
         if kind == bool:
-            ret = (ret not in [0, "0"])
+            ret = (ret in [1, "1", "true", "yes"])
         elif kind == int:
-            ret = int(ret)
+            try:
+                val = int(ret)
+            except TypeError:
+                val = ret
+            except ValueError:
+                val = ret
+            ret = val
         elif kind == str:
-            ret = str(ret)  # pylint: disable=redefined-variable-type
+            ret = str(ret)
     return ret
 
 
@@ -105,21 +106,17 @@ class VimAppendHandler(logging.Handler):
         """ Look for the named buffer """
         for buff in vim.buffers:
             if buff and buff.name and buff.name.endswith(self.__name):
-                return buff
+                yield buff
 
     def emit(self, record):
         """ Emit the logging message """
-        buff = self.__find_buffer()
-        if buff:
+        for buff in self.__find_buffer():
             buff.append(self.__formatter.format(record))
 
 
 def set_logger_verbosity():
     """ Set the verbosity of the logger """
-    try:
-        level = int(vim_global("VerbosityLevel"))
-    except ValueError:
-        level = GLOBALS_DEFAULTS["VerbosityLevel"]
+    level = vim_global("VerbosityLevel", kind=int)
     LOGGER.setLevel(level)
 
 
@@ -139,9 +136,8 @@ except NameError:
     set_logger_verbosity()
 
 
-class AutoTag(object):  # pylint: disable=too-many-instance-attributes
+class AutoTag():  # pylint: disable=too-many-instance-attributes
     """ Class that does auto ctags updating """
-    MAXTAGSFILESIZE = int(vim_global("maxTagsFileSize"))
     LOG = LOGGER
 
     def __init__(self):
@@ -161,7 +157,7 @@ class AutoTag(object):  # pylint: disable=too-many-instance-attributes
         AutoTag.LOG.info('source = "%s"', source)
         (drive, fname) = os.path.splitdrive(source)
         ret = None
-        while fname:
+        while ret is None:
             fname = os.path.dirname(fname)
             AutoTag.LOG.info('drive = "%s", file = "%s"', drive, fname)
             tags_dir = os.path.join(drive, fname)
@@ -172,27 +168,23 @@ class AutoTag(object):  # pylint: disable=too-many-instance-attributes
                 if stinf:
                     size = getattr(stinf, 'st_size', None)
                     if size is None:
-                        AutoTag.LOG.warn("Could not stat tags file %s", tags_file)
-                        break
-                    if size > AutoTag.MAXTAGSFILESIZE:
-                        AutoTag.LOG.info("Ignoring too big tags file %s", tags_file)
-                        break
+                        AutoTag.LOG.warning("Could not stat tags file %s", tags_file)
+                        ret = ""
                 ret = (fname, tags_file)
-                break
             elif tags_dir and tags_dir == self.stop_at:
                 AutoTag.LOG.info("Reached %s. Making one %s", self.stop_at, tags_file)
                 open(tags_file, 'wb').close()
                 ret = (fname, tags_file)
-                break
+                ret = ""
             elif not fname or fname == os.sep or fname == "//" or fname == "\\\\":
                 AutoTag.LOG.info('bail (file = "%s")', fname)
-                break
-        return ret
+                ret = ""
+        return ret or None
 
     def add_source(self, source):
         """ Make a note of the source file, ignoring some etc """
         if not source:
-            AutoTag.LOG.warn('No source')
+            AutoTag.LOG.warning('No source')
             return
         if os.path.basename(source) == self.tags_file:
             AutoTag.LOG.info("Ignoring tags file %s", self.tags_file)
@@ -203,7 +195,7 @@ class AutoTag(object):  # pylint: disable=too-many-instance-attributes
             return
         found = self.find_tag_file(source)
         if found:
-            (tags_dir, tags_file) = found  # pylint: disable=W0633
+            (tags_dir, tags_file) = found
             relative_source = os.path.splitdrive(source)[1][len(tags_dir):]
             if relative_source[0] == os.sep:
                 relative_source = relative_source[1:]
@@ -216,28 +208,26 @@ class AutoTag(object):  # pylint: disable=too-many-instance-attributes
         """ Filter method for stripping tags """
         if line[0] == '!':
             return True
-        else:
-            fields = line.split('\t')
-            AutoTag.LOG.log(1, "read tags line:%s", str(fields))
-            if len(fields) > 3 and fields[1] not in excluded:
-                return True
+        fields = line.split('\t')
+        AutoTag.LOG.log(1, "read tags line:%s", str(fields))
+        if len(fields) > 3 and fields[1] not in excluded:
+            return True
         return False
 
     def strip_tags(self, tags_file, sources):
         """ Strip all tags for a given source file """
         AutoTag.LOG.info("Stripping tags for %s from tags file %s", ",".join(sources), tags_file)
         backup = ".SAFE"
-        source = fileinput.FileInput(files=tags_file, inplace=True, backup=backup)
         try:
-            for line in source:
-                line = line.strip()
-                if self.good_tag(line, sources):
-                    print(line)
+            with fileinput.FileInput(files=tags_file, inplace=True, backup=backup) as source:
+                for line in source:
+                    line = line.strip()
+                    if self.good_tag(line, sources):
+                        print(line)
         finally:
-            source.close()
             try:
                 os.unlink(tags_file + backup)
-            except StandardError:
+            except IOError:
                 pass
 
     def update_tags_file(self, tags_dir, tags_file, sources):
@@ -257,9 +247,13 @@ class AutoTag(object):  # pylint: disable=too-many-instance-attributes
             AutoTag.LOG.log(10, line)
 
     def rebuild_tag_files(self):
-        """ rebuild the tags file """
+        """ rebuild the tags file thread worker """
         for ((tags_dir, tags_file), sources) in self.tags.items():
-            self.update_tags_file(tags_dir, tags_file, sources)
+            # self.update_tags_file(tags_dir, tags_file, sources)
+            proc = multiprocessing.Process(target=self.update_tags_file,
+                                           args=(tags_dir, tags_file, sources))
+            proc.daemon = True
+            proc.start()
 
 
 def autotag():
@@ -269,5 +263,5 @@ def autotag():
             runner = AutoTag()
             runner.add_source(vim.eval("expand(\"%:p\")"))
             runner.rebuild_tag_files()
-    except Exception:  # pylint: disable=W0703
+    except Exception:  # pylint: disable=broad-except
         logging.warning(format_exc())
