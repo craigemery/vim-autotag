@@ -12,7 +12,7 @@ from collections import defaultdict
 import subprocess
 from traceback import format_exc
 import sys
-import multiprocessing
+import multiprocessing as mp
 import glob
 import vim  # pylint: disable=import-error
 
@@ -35,18 +35,22 @@ GLOBALS_DEFAULTS = dict(ExcludeSuffixes="tml.xml.text.txt",
 
 def fix_multiprocessing():
     """ Find a good Python executable to use for multiprocessing.Process """
-    if sys.executable:
-        multiprocessing.set_executable(sys.executable)
+    try:
+        mp.set_executable
+    except AttributeError:
         return
-
+    if mp.get_start_method() != 'spawn':
+        # Only need to fix the executable when start method is spawn
+        # Most Linux implementations have "fork"
+        return
     exes = glob.glob(os.path.join(sys.exec_prefix, "python*.exe"))
     win = [exe for exe in exes if exe.endswith("w.exe")]
     if win:
         # In Windows pythonw.exe is best
-        multiprocessing.set_executable(win[0])
+        mp.set_executable(win[0])
     else:
         # This is bad, for now pick the first one
-        multiprocessing.set_executable(exes[0])
+        mp.set_executable(exes[0])
 
 
 fix_multiprocessing()
@@ -254,8 +258,8 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
         """ rebuild the tags file thread worker """
         for ((tags_dir, tags_file), sources) in self.tags.items():
             # self.update_tags_file(tags_dir, tags_file, sources)
-            proc = multiprocessing.Process(target=self.update_tags_file,
-                                           args=(tags_dir, tags_file, sources))
+            proc = mp.Process(target=self.update_tags_file,
+                              args=(tags_dir, tags_file, sources))
             proc.daemon = True
             proc.start()
 
