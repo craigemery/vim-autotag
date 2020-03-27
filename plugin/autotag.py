@@ -4,17 +4,18 @@ AutoTag.py
 """
 
 from __future__ import print_function
+import sys
 import os
-import os.path
 import fileinput
 import logging
 from collections import defaultdict
 import subprocess
 from traceback import format_exc
-import sys
 import multiprocessing as mp
 import glob
 import vim  # pylint: disable=import-error
+
+__all__ = ["autotag"]
 
 # global vim config variables used (all are g:autotag<name>):
 # name purpose
@@ -149,6 +150,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
     LOG = LOGGER
 
     def __init__(self):
+        self.locks = {}
         self.tags = defaultdict(list)
         self.excludesuffix = ["." + s for s in vim_global("ExcludeSuffixes").split(".")]
         set_logger_verbosity()
@@ -209,7 +211,10 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
                 relative_source = relative_source[1:]
             if os.sep != self.sep_used_by_ctags:
                 relative_source = relative_source.replace(os.sep, self.sep_used_by_ctags)
-            self.tags[(tags_dir, tags_file)].append(relative_source)
+            key = (tags_dir, tags_file)
+            self.tags[key].append(relative_source)
+            if key not in self.locks:
+                self.locks[key] = mp.Lock()
 
     @staticmethod
     def good_tag(line, excluded):
@@ -238,11 +243,12 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
             except IOError:
                 pass
 
-    def update_tags_file(self, tags_dir, tags_file, sources):
+    def update_tags_file(self, key, sources):
         """ Strip all tags for the source file, then re-run ctags in append mode """
+        (tags_dir, tags_file) = key
+        lock = self.locks[key]
         if self.tags_dir:
             sources = [os.path.join(self.parents + s) for s in sources]
-        self.strip_tags(tags_file, sources)
         if self.tags_file:
             cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
         else:
@@ -250,16 +256,16 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
         for source in sources:
             if os.path.isfile(os.path.join(tags_dir, self.tags_dir, source)):
                 cmd += ' "%s"' % source
-        AutoTag.LOG.log(1, "%s: %s", tags_dir, cmd)
-        for line in do_cmd(cmd, self.tags_dir or tags_dir):
-            AutoTag.LOG.log(10, line)
+        with lock:
+            self.strip_tags(tags_file, sources)
+            AutoTag.LOG.log(1, "%s: %s", tags_dir, cmd)
+            for line in do_cmd(cmd, self.tags_dir or tags_dir):
+                AutoTag.LOG.log(10, line)
 
     def rebuild_tag_files(self):
         """ rebuild the tags file thread worker """
-        for ((tags_dir, tags_file), sources) in self.tags.items():
-            # self.update_tags_file(tags_dir, tags_file, sources)
-            proc = mp.Process(target=self.update_tags_file,
-                              args=(tags_dir, tags_file, sources))
+        for (key, sources) in self.tags.items():
+            proc = mp.Process(target=self.update_tags_file, args=(key, sources))
             proc.daemon = True
             proc.start()
 
