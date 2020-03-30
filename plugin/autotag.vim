@@ -1,4 +1,5 @@
-" (c) Craig Emery 2020
+"
+" (c) Craig Emery 2017-2020
 "
 " Increment the number below for a dynamic #include guard
 let s:autotag_vim_version=1
@@ -14,30 +15,19 @@ let g:autotag_vim_version_sourced=s:autotag_vim_version
 " This file supplies automatic tag regeneration when saving files
 " There's a problem with ctags when run with -a (append)
 " ctags doesn't remove entries for the supplied source file that no longer exist
-" so this script (implemented in python) finds a tags file for the file vim has
+" so this script (implemented in Python) finds a tags file for the file vim has
 " just saved, removes all entries for that source file and *then* runs ctags -a
 
-if has("python") || has("python3")
-   if has("python")
-      python  import sys, os, vim
-      python  sys.path.insert(0, os.path.dirname(vim.eval('expand("<sfile>")')))
-      python  from __future__ import print_function
-      python  from autotag import autotag
-   else
-      python3 import sys, os, vim
-      python3 sys.path.insert(0, os.path.dirname(vim.eval('expand("<sfile>")')))
-      python3 from autotag import autotag
-   endif
+if has("python3")
+   python3 import sys, os, vim
+   python3 sys.path.insert(0, os.path.dirname(vim.eval('expand("<sfile>")')))
+   python3 from autotag import autotag
 
    function! AutoTag()
       if exists("b:netrw_method")
          return
       endif
-      if has("python")
-         python  autotag()
-      else
-         python3 autotag()
-      endif
+      python3 autotag()
       if exists(":TlistUpdate")
          TlistUpdate
       endif
@@ -57,6 +47,6 @@ if has("python") || has("python3")
       autocmd BufWritePost,FileWritePost * call AutoTag ()
    augroup END
 
-endif " has("python") or has("python3")
+endif " has("python3")
 
 " vim:shiftwidth=3:ts=3
