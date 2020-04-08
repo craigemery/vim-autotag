@@ -1,1 +1,3 @@
-/plugin/autotag.pyc
+tags
+*/__pycache__
+.*.sw?
