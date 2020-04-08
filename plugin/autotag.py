@@ -253,7 +253,16 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
             cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
         else:
             cmd = "%s -a " % (self.ctags_cmd,)
-        for source in sources:
+
+        def is_file(src):
+            """ inner """
+            return os.path.isfile(os.path.join(tags_dir, self.tags_dir, src))
+
+        srcs = list(filter(sources, is_file))
+        if not srcs:
+            return
+
+        for source in srcs:
             if os.path.isfile(os.path.join(tags_dir, self.tags_dir, source)):
                 cmd += ' "%s"' % source
         with lock:
