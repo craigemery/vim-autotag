@@ -148,11 +148,14 @@ except NameError:
 class AutoTag():  # pylint: disable=too-many-instance-attributes
     """ Class that does auto ctags updating """
     LOG = LOGGER
+    AUTOFILETYPES = ["python"]
+    FILETYPES = {}
 
     def __init__(self):
         self.locks = {}
         self.tags = defaultdict(list)
         self.excludesuffix = ["." + s for s in vim_global("ExcludeSuffixes").split(".")]
+        self.excludefiletype = vim_global("ExcludeFiletypes").split(",")
         set_logger_verbosity()
         self.sep_used_by_ctags = '/'
         self.ctags_cmd = vim_global("CtagsCmd")
@@ -191,7 +194,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
                 ret = ""
         return ret or None
 
-    def add_source(self, source):
+    def add_source(self, source, filetype):
         """ Make a note of the source file, ignoring some etc """
         if not source:
             AutoTag.LOG.warning('No source')
@@ -200,8 +203,17 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
             AutoTag.LOG.info("Ignoring tags file %s", self.tags_file)
             return
         suff = os.path.splitext(source)[1]
+        if suff:
+            AutoTag.LOG.info("Source %s has suffix %s, so filetype doesn't count!", source, suff)
+            filetype = None
+        else:
+            AutoTag.LOG.info("Source %s has no suffix, so filetype counts!", source)
+
         if suff in self.excludesuffix:
-            AutoTag.LOG.info("Ignoring excluded suffix %s for file %s", source, suff)
+            AutoTag.LOG.info("Ignoring excluded suffix %s for file %s", suff, source)
+            return
+        if filetype in self.excludefiletype:
+            AutoTag.LOG.info("Ignoring excluded filetype %s for file %s", filetype, source)
             return
         found = self.find_tag_file(source)
         if found:
@@ -211,7 +223,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
                 relative_source = relative_source[1:]
             if os.sep != self.sep_used_by_ctags:
                 relative_source = relative_source.replace(os.sep, self.sep_used_by_ctags)
-            key = (tags_dir, tags_file)
+            key = (tags_dir, tags_file, filetype)
             self.tags[key].append(relative_source)
             if key not in self.locks:
                 self.locks[key] = mp.Lock()
@@ -243,16 +255,26 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
             except IOError:
                 pass
 
+    def _vim_ft_to_ctags_ft(self, name):
+        """ convert vim filetype strings to ctags strings """
+        if name in AutoTag.AUTOFILETYPES:
+            return name
+        return self.FILETYPES.get(name, None)
+
     def update_tags_file(self, key, sources):
         """ Strip all tags for the source file, then re-run ctags in append mode """
-        (tags_dir, tags_file) = key
+        (tags_dir, tags_file, filetype) = key
         lock = self.locks[key]
         if self.tags_dir:
             sources = [os.path.join(self.parents + s) for s in sources]
+        cmd = [self.ctags_cmd]
         if self.tags_file:
-            cmd = "%s -f %s -a " % (self.ctags_cmd, self.tags_file)
-        else:
-            cmd = "%s -a " % (self.ctags_cmd,)
+            cmd += ["-f", self.tags_file]
+        if filetype:
+            ctags_filetype = self._vim_ft_to_ctags_ft(filetype)
+            if ctags_filetype:
+                cmd += ["--language-force=%s" % ctags_filetype]
+        cmd += ["-a"]
 
         def is_file(src):
             """ inner """
@@ -262,9 +284,8 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
         if not srcs:
             return
 
-        for source in srcs:
-            if os.path.isfile(os.path.join(tags_dir, self.tags_dir, source)):
-                cmd += ' "%s"' % source
+        cmd += ['"%s"' % s for s in srcs]
+        cmd = " ".join(cmd)
         with lock:
             self.strip_tags(tags_file, sources)
             AutoTag.LOG.log(1, "%s: %s", tags_dir, cmd)
@@ -274,6 +295,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
     def rebuild_tag_files(self):
         """ rebuild the tags file thread worker """
         for (key, sources) in self.tags.items():
+            AutoTag.LOG.info('Process(%s, %s)' % (key, ",".join(sources)))
             proc = mp.Process(target=self.update_tags_file, args=(key, sources))
             proc.daemon = True
             proc.start()
@@ -284,7 +306,7 @@ def autotag():
     try:
         if not vim_global("Disabled", bool):
             runner = AutoTag()
-            runner.add_source(vim.eval("expand(\"%:p\")"))
+            runner.add_source(vim.eval("expand(\"%:p\")"), vim.eval("&ft"))
             runner.rebuild_tag_files()
     except Exception:  # pylint: disable=broad-except
         logging.warning(format_exc())
