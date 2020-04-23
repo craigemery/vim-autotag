@@ -38,6 +38,18 @@ Or you can manually install
 git clone git://github.com/craigemery/vim-autotag.git ~/.vim/bundle/vim-autotag
 ```
 
+Getting round other ctags limitations
+-------------------------------------
+ctags is very file name suffix driven. When the file has no suffix, ctags can fail to detect the file type.
+The easiest way to replicate this is when using a #! shebang. I've seen "#!/usr/bin/env python3" in a 
+shebang not get detected by ctags.
+But Vim is better at this. So Vim's filetype buffer setting can help.
+So when the buffer being written has no suffix to th efile name then the Vim filetype value will be ued instead.
+So far I've only implemented "python" as one that is given to ctags --language-force=<here> as is.
+Other filetypes could be mapped. There's a dict in the AutTag class.
+To not map a filetype to a forced language kind, add the vim file type to the comma "," separated
+list in autotagExcludeFiletypes.
+
 Configuration
 -------------
 Autotag can be configured using the following global variables:
@@ -45,6 +57,7 @@ Autotag can be configured using the following global variables:
 | Name | Purpose |
 | ---- | ------- |
 | `g:autotagExcludeSuffixes` | suffixes to not ctags on |
+| `g:autotagExcludeFiletypes` | filetypes to not try & forge a language choice on ctags |
 | `g:autotagVerbosityLevel` | logging verbosity (as in Python logging module) |
 | `g:autotagCtagsCmd` | name of ctags command |
 | `g:autotagTagsFile` | name of tags file to look for |
