@@ -280,7 +280,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
             """ inner """
             return os.path.isfile(os.path.join(tags_dir, self.tags_dir, src))
 
-        srcs = list(filter(sources, is_file))
+        srcs = list(filter(is_file, sources))
         if not srcs:
             return
 
