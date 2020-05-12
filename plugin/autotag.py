@@ -12,7 +12,7 @@ from collections import defaultdict
 import subprocess
 from traceback import format_exc
 import multiprocessing as mp
-import glob
+from glob import glob
 import vim  # pylint: disable=import-error
 
 __all__ = ["autotag"]
@@ -44,14 +44,18 @@ def fix_multiprocessing():
         # Only need to fix the executable when start method is spawn
         # Most Linux implementations have "fork"
         return
-    exes = glob.glob(os.path.join(sys.exec_prefix, "python*.exe"))
-    win = [exe for exe in exes if exe.endswith("w.exe")]
-    if win:
-        # In Windows pythonw.exe is best
-        mp.set_executable(win[0])
-    else:
-        # This is bad, for now pick the first one
-        mp.set_executable(exes[0])
+    suff = os.path.splitext(sys.executable)[1]
+    pat1 = "python*%s" % suff
+    pat2 = os.path.join("bin", pat1)
+    exes = glob(os.path.join(sys.exec_prefix, pat1)) + glob(os.path.join(sys.exec_prefix, pat2))
+    if exes:
+        win = [exe for exe in exes if exe.endswith("w%s" % suff)]
+        if win:
+            # In Windows pythonw.exe is best
+            mp.set_executable(win[0])
+        else:
+            # This isn't great, for now pick the first one
+            mp.set_executable(exes[0])
 
 
 fix_multiprocessing()
@@ -295,7 +299,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
     def rebuild_tag_files(self):
         """ rebuild the tags file thread worker """
         for (key, sources) in self.tags.items():
-            AutoTag.LOG.info('Process(%s, %s)' % (key, ",".join(sources)))
+            AutoTag.LOG.info('Process(%s, %s)', key, ",".join(sources))
             proc = mp.Process(target=self.update_tags_file, args=(key, sources))
             proc.daemon = True
             proc.start()
