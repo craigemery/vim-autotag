@@ -63,11 +63,21 @@ Autotag can be configured using the following global variables:
 | `g:autotagTagsFile` | name of tags file to look for |
 | `g:autotagDisabled` | Disable autotag (enable by setting to any non-blank value) |
 | `g:autotagStopAt` | stop looking for a tags file (and make one) at this directory (defaults to $HOME) |
+| `g:autotagStartMethod` | Now AutoTag uses Python multiprocessing, the start method is an internal aspect that Python uses.
 
 These can be overridden with buffer specific ones. b: instead of g:
 Example:
 ```
 let g:autotagTagsFile=".tags"
+```
+
+macOS, Python 3.8 and 'spawn'
+-----------------------------
+With the release of Python 3.8, the default start method for multiprocessing on macOS has become 'spawn'
+At the time of writing there are issues with 'spawn' and I advise making AutoTag ask Python to use 'fork'
+i.e. before loading the plugin:
+```
+let g:autotagStartMethod='fork'
 ```
 
 Self-Promotion
