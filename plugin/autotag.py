@@ -31,34 +31,8 @@ GLOBALS_DEFAULTS = dict(ExcludeSuffixes="tml.xml.text.txt",
                         TagsFile="tags",
                         TagsDir="",
                         Disabled=0,
-                        StopAt=0)
-
-
-def fix_multiprocessing():
-    """ Find a good Python executable to use for multiprocessing.Process """
-    try:
-        mp.set_executable
-    except AttributeError:
-        return
-    if mp.get_start_method() != 'spawn':
-        # Only need to fix the executable when start method is spawn
-        # Most Linux implementations have "fork"
-        return
-    suff = os.path.splitext(sys.executable)[1]
-    pat1 = "python*%s" % suff
-    pat2 = os.path.join("bin", pat1)
-    exes = glob(os.path.join(sys.exec_prefix, pat1)) + glob(os.path.join(sys.exec_prefix, pat2))
-    if exes:
-        win = [exe for exe in exes if exe.endswith("w%s" % suff)]
-        if win:
-            # In Windows pythonw.exe is best
-            mp.set_executable(win[0])
-        else:
-            # This isn't great, for now pick the first one
-            mp.set_executable(exes[0])
-
-
-fix_multiprocessing()
+                        StopAt=0,
+                        StartMethod="")
 
 
 def do_cmd(cmd, cwd):
@@ -106,6 +80,40 @@ def vim_global(name, kind=str):
         elif kind == str:
             ret = str(ret)
     return ret
+
+
+def init_multiprocessing():
+    """ Init multiprocessing, set_executable() & get the context we'll use """
+    wanted_start_method = vim_global("StartMethod") or None
+    used_start_method = mp.get_start_method()
+    if wanted_start_method in mp.get_all_start_methods():
+        used_start_method = wanted_start_method
+    else:
+        wanted_start_method = None
+    # here wanted_start_method is either a valid method or None
+    # used_start_method is what the module has as the default or our overriden value
+    ret = mp.get_context(wanted_start_method)  # wanted_start_method might be None
+    try:
+        mp.set_executable
+    except AttributeError:
+        return ret
+    if used_start_method == 'spawn':
+        suff = os.path.splitext(sys.executable)[1]
+        pat1 = "python*%s" % suff
+        pat2 = os.path.join("bin", pat1)
+        exes = glob(os.path.join(sys.exec_prefix, pat1)) + glob(os.path.join(sys.exec_prefix, pat2))
+        if exes:
+            win = [exe for exe in exes if exe.endswith("w%s" % suff)]
+            if win:
+                # In Windows pythonw.exe is best
+                ret.set_executable(win[0])
+            else:
+                # This isn't great, for now pick the first one
+                ret.set_executable(exes[0])
+    return ret
+
+
+CTX = init_multiprocessing()
 
 
 class VimAppendHandler(logging.Handler):
@@ -230,7 +238,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
             key = (tags_dir, tags_file, filetype)
             self.tags[key].append(relative_source)
             if key not in self.locks:
-                self.locks[key] = mp.Lock()
+                self.locks[key] = CTX.Lock()
 
     @staticmethod
     def good_tag(line, excluded):
@@ -300,7 +308,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
         """ rebuild the tags file thread worker """
         for (key, sources) in self.tags.items():
             AutoTag.LOG.info('Process(%s, %s)', key, ",".join(sources))
-            proc = mp.Process(target=self.update_tags_file, args=(key, sources))
+            proc = CTX.Process(target=self.update_tags_file, args=(key, sources))
             proc.daemon = True
             proc.start()
 
