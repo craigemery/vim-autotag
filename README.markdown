@@ -44,7 +44,7 @@ ctags is very file name suffix driven. When the file has no suffix, ctags can fa
 The easiest way to replicate this is when using a #! shebang. I've seen "#!/usr/bin/env python3" in a 
 shebang not get detected by ctags.  
 But Vim is better at this. So Vim's filetype buffer setting can help.  
-So when the buffer being written has no suffix to th efile name then the Vim filetype value will be ued instead.  
+So when the buffer being written has no suffix to the file name then the Vim filetype value will be used instead.  
 So far I've only implemented "python" as one that is given to ctags --language-force=<here> as is.  
 Other filetypes could be mapped. There's a dict in the AutTag class.  
 To not map a filetype to a forced language kind, add the vim file type to the comma "," separated
