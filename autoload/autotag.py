@@ -37,15 +37,10 @@ GLOBALS_DEFAULTS = dict(ExcludeSuffixes="tml.xml.text.txt",
 
 def do_cmd(cmd, cwd):
     """ Abstract subprocess """
-    proc = subprocess.Popen(cmd,
-                            cwd=cwd,
-                            shell=True,
-                            stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            universal_newlines=True)
-    stdout = proc.communicate()[0]
-    return stdout.split("\n")
+    with subprocess.Popen(cmd, cwd=cwd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, universal_newlines=True) as proc:
+        stdout = proc.communicate()[0]
+        return stdout.split("\n")
 
 
 def vim_global(name, kind=str):
@@ -54,18 +49,18 @@ def vim_global(name, kind=str):
     try:
         vname = "autotag" + name
         v_buffer = "b:" + vname
-        exists_buffer = (vim.eval("exists('%s')" % v_buffer) == "1")
+        exists_buffer = (vim.eval(f"exists('{v_buffer}')") == "1")
         v_global = "g:" + vname
-        exists_global = (vim.eval("exists('%s')" % v_global) == "1")
+        exists_global = (vim.eval(f"exists('{v_global}')") == "1")
         if exists_buffer:
             ret = vim.eval(v_buffer)
         elif exists_global:
             ret = vim.eval(v_global)
         else:
             if isinstance(ret, int):
-                vim.command("let %s=%s" % (v_global, ret))
+                vim.command(f"let {v_global}={ret}")
             else:
-                vim.command("let %s=\"%s\"" % (v_global, ret))
+                vim.command(f"let {v_global}=\"{ret}\"")
     finally:
         if kind == bool:
             ret = (ret in [1, "1", "true", "yes"])
@@ -99,11 +94,11 @@ def init_multiprocessing():
         return ret
     if used_start_method == 'spawn':
         suff = os.path.splitext(sys.executable)[1]
-        pat1 = "python*%s" % suff
+        pat1 = f"python*{suff}"
         pat2 = os.path.join("bin", pat1)
         exes = glob(os.path.join(sys.exec_prefix, pat1)) + glob(os.path.join(sys.exec_prefix, pat2))
         if exes:
-            win = [exe for exe in exes if exe.endswith("w%s" % suff)]
+            win = [exe for exe in exes if exe.endswith(f"w{suff}")]
             if win:
                 # In Windows pythonw.exe is best
                 ret.set_executable(win[0])
@@ -285,7 +280,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
         if filetype:
             ctags_filetype = self._vim_ft_to_ctags_ft(filetype)
             if ctags_filetype:
-                cmd += ["--language-force=%s" % ctags_filetype]
+                cmd += [f"--language-force={ctags_filetype}"]
         cmd += ["-a"]
 
         def is_file(src):
@@ -296,7 +291,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
         if not srcs:
             return
 
-        cmd += ['"%s"' % s for s in srcs]
+        cmd += [f'"{s}"' % s for s in srcs]
         cmd = " ".join(cmd)
         with lock:
             self.strip_tags(tags_file, sources)
