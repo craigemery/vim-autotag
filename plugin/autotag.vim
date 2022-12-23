@@ -19,19 +19,6 @@ let g:autotag_vim_version_sourced=s:autotag_vim_version
 " just saved, removes all entries for that source file and *then* runs ctags -a
 
 if has("python3")
-   python3 import sys, os, vim
-   python3 sys.path.insert(0, os.path.dirname(vim.eval('expand("<sfile>")')))
-   python3 import autotag
-
-   function! AutoTag()
-      if exists("b:netrw_method")
-         return
-      endif
-      python3 autotag.autotag()
-      if exists(":TlistUpdate")
-         TlistUpdate
-      endif
-   endfunction
 
    function! AutoTagDebug()
       new
@@ -44,7 +31,7 @@ if has("python3")
 
    augroup autotag
       au!
-      autocmd BufWritePost,FileWritePost * call AutoTag ()
+      autocmd BufWritePost,FileWritePost * call autotag#Run ()
    augroup END
 
 endif " has("python3")
