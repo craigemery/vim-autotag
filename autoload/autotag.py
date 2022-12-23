@@ -1,5 +1,5 @@
 """
-(c) Craig Emery 2017-2020
+(c) Craig Emery 2017-2022
 AutoTag.py
 """
 
