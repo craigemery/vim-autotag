@@ -1,5 +1,5 @@
 "
-" (c) Craig Emery 2017-2020
+" (c) Craig Emery 2017-2022
 "
 " Increment the number below for a dynamic #include guard
 let s:autotag_vim_version=1
@@ -18,22 +18,22 @@ let g:autotag_vim_version_sourced=s:autotag_vim_version
 " so this script (implemented in Python) finds a tags file for the file vim has
 " just saved, removes all entries for that source file and *then* runs ctags -a
 
-if has("python3")
-
-   function! AutoTagDebug()
-      new
-      file autotag_debug
-      setlocal buftype=nowrite
-      setlocal bufhidden=delete
-      setlocal noswapfile
-      normal 
-   endfunction
-
-   augroup autotag
-      au!
-      autocmd BufWritePost,FileWritePost * call autotag#Run ()
-   augroup END
-
+if ! has("python3")
+   finish
 endif " has("python3")
+
+function! AutoTagDebug()
+   new
+   file autotag_debug
+   setlocal buftype=nowrite
+   setlocal bufhidden=delete
+   setlocal noswapfile
+   normal 
+endfunction
+
+augroup autotag
+   au!
+   autocmd BufWritePost,FileWritePost * call autotag#Run ()
+augroup END
 
 " vim:shiftwidth=3:ts=3
