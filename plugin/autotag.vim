@@ -18,9 +18,9 @@ let g:autotag_vim_version_sourced=s:autotag_vim_version
 " so this script (implemented in Python) finds a tags file for the file vim has
 " just saved, removes all entries for that source file and *then* runs ctags -a
 
-if ! has("python3")
+if !has("python3")
    finish
-endif " has("python3")
+endif " !has("python3")
 
 function! AutoTagDebug()
    new
