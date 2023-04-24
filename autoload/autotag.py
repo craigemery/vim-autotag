@@ -291,7 +291,7 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
         if not srcs:
             return
 
-        cmd += [f'"{s}"' % s for s in srcs]
+        cmd += [f'"{s}"' for s in srcs]
         cmd = " ".join(cmd)
         with lock:
             self.strip_tags(tags_file, sources)
