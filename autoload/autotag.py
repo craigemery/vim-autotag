@@ -4,6 +4,7 @@ AutoTag.py
 """
 
 from __future__ import print_function
+from re import L
 import sys
 import os
 import fileinput
@@ -171,6 +172,18 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
         self.parents = os.pardir * (len(os.path.split(self.tags_dir)) - 1)
         self.count = 0
         self.stop_at = vim_global("StopAt")
+        self.current = vim.eval("expand(\"%:p\")") 
+        self.gitloc=None
+        self.found=False
+
+    def get_git_soruces(self):
+        try: 
+            self.gitloc = do_cmd(self.current,'git rev-parse --show-toplevel')[0]
+            self.gitfiles = do_cmd(self.gitloc,'git ls-files --full-name')
+        except:
+            AutoTag.LOG.warning("Not a git repo")
+
+
 
     def find_tag_file(self, source):
         """ Find the tag file that belongs to the source file """
@@ -216,15 +229,23 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
         else:
             AutoTag.LOG.info("Source %s has no suffix, so filetype counts!", source)
 
+        if source not in self.gitfiles:
+            AutoTag.LOG.info("Ignoring %s not in git",  source)
+            return
+
+        if suff !='py':
+            AutoTag.LOG.info("Ignoring excluded suffix %s for file %s", suff, source)
+            return
+
         if suff in self.excludesuffix:
             AutoTag.LOG.info("Ignoring excluded suffix %s for file %s", suff, source)
             return
         if filetype in self.excludefiletype:
             AutoTag.LOG.info("Ignoring excluded filetype %s for file %s", filetype, source)
             return
-        found = self.find_tag_file(source)
-        if found:
-            (tags_dir, tags_file) = found
+        self.found = self.find_tag_file(source)
+        if self.found:
+            (tags_dir, tags_file) = self.found
             relative_source = os.path.splitdrive(source)[1][len(tags_dir):]
             if relative_source[0] == os.sep:
                 relative_source = relative_source[1:]
@@ -234,6 +255,11 @@ class AutoTag():  # pylint: disable=too-many-instance-attributes
             self.tags[key].append(relative_source)
             if key not in self.locks:
                 self.locks[key] = CTX.Lock()
+        else:
+            for k in self.gitfiles: 
+                self.add_source(k,'python')
+
+
 
     @staticmethod
     def good_tag(line, excluded):
@@ -313,7 +339,8 @@ def autotag():
     try:
         if not vim_global("Disabled", bool):
             runner = AutoTag()
-            runner.add_source(vim.eval("expand(\"%:p\")"), vim.eval("&ft"))
+            runner.get_git_soruces()
+            runner.add_source(runner.current, vim.eval("&ft"))
             runner.rebuild_tag_files()
     except Exception:  # pylint: disable=broad-except
         logging.warning(format_exc())
